@@ -6,6 +6,7 @@ import '../../../core/storage/token_storage.dart';
 import '../data/order_model.dart';
 import '../data/orders_service.dart';
 import 'order_detail_card.dart';
+import 'order_status_chip.dart';
 
 class MyOrdersPage extends StatefulWidget {
   const MyOrdersPage({super.key});
@@ -178,8 +179,6 @@ class _OrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final paymentStatus =
-        order.paymentStatusDisplay ?? order.paymentStatus ?? 'Sin pago';
     final paymentMethod =
         order.paymentMethodDisplay ?? order.paymentMethod ?? 'Sin metodo';
 
@@ -214,10 +213,7 @@ class _OrderCard extends StatelessWidget {
               runSpacing: 8,
               spacing: 8,
               children: [
-                _InfoChip(
-                  icon: Icons.flag_outlined,
-                  text: order.statusDisplay ?? order.status,
-                ),
+                OrderStatusChip(status: order.status),
                 _InfoChip(
                   icon: Icons.calendar_today_outlined,
                   text: _formatDate(order.createdAt),
@@ -231,12 +227,11 @@ class _OrderCard extends StatelessWidget {
                   text: order.warehouseName ?? 'Almacen',
                 ),
                 _InfoChip(
-                  icon: Icons.payments_outlined,
-                  text: paymentStatus,
-                ),
-                _InfoChip(
                   icon: Icons.credit_card_outlined,
                   text: paymentMethod,
+                ),
+                OrderStatusChip(
+                  status: order.paymentStatus ?? order.paymentStatusDisplay,
                 ),
               ],
             ),

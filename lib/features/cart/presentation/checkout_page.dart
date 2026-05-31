@@ -6,6 +6,7 @@ import '../../../core/config/app_routes.dart';
 import '../../../core/storage/token_storage.dart';
 import '../../orders/data/order_model.dart';
 import '../../orders/data/orders_service.dart';
+import '../../orders/presentation/order_status_chip.dart';
 import '../state/cart_provider.dart';
 
 class CheckoutPage extends ConsumerStatefulWidget {
@@ -164,13 +165,28 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
                   ),
                   const SizedBox(height: 18),
                   Card(
-                    child: ListTile(
-                      leading: Icon(
-                        Icons.payments_outlined,
-                        color: Theme.of(context).colorScheme.primary,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.payments_outlined,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Pago simulado'),
+                                SizedBox(height: 4),
+                                Text('Metodo: efectivo'),
+                              ],
+                            ),
+                          ),
+                          const OrderStatusChip(status: 'PAID'),
+                        ],
                       ),
-                      title: const Text('Pago simulado'),
-                      subtitle: const Text('Metodo: efectivo - Estado: pagado'),
                     ),
                   ),
                   const SizedBox(height: 24),
