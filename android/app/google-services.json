@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "657515213549",
+    "project_id": "eco-customer-app-7d6c1",
+    "storage_bucket": "eco-customer-app-7d6c1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:657515213549:android:e602137288df3caab892e4",
+        "android_client_info": {
+          "package_name": "com.example.eco_customer_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyALGaYzew3Z5o6DdU1BWRAP4l6n2VeAiLQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

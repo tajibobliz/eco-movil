@@ -19,6 +19,14 @@ class OrdersService {
         .toList();
   }
 
+  Future<OrderModel> cancelOrder(int orderId) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/sales/orders/$orderId/cancel/',
+    );
+
+    return OrderModel.fromJson(response.data ?? {});
+  }
+
   Future<OrderModel> createOrder({
     int storeId = defaultStoreId,
     int warehouseId = defaultWarehouseId,

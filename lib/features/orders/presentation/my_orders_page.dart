@@ -21,6 +21,7 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
 
   List<OrderModel> _orders = [];
   bool _loading = true;
+  int? _cancellingOrderId;
   String? _error;
 
   @override
@@ -60,6 +61,49 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
       });
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _cancelOrder(OrderModel order) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancelar pedido'),
+        content: const Text('¿Desea cancelar este pedido?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Volver'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Cancelar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _cancellingOrderId = order.id);
+
+    try {
+      await _ordersService.cancelOrder(order.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pedido cancelado correctamente.')),
+      );
+      await _loadOrders();
+    } catch (error) {
+      if (!mounted) return;
+      final message = error is DioException
+          ? _extractErrorMessage(error)
+          : 'No se pudo cancelar el pedido.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    } finally {
+      if (mounted) setState(() => _cancellingOrderId = null);
     }
   }
 
@@ -166,21 +210,44 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
       padding: const EdgeInsets.all(16),
       itemCount: _orders.length,
       itemBuilder: (context, index) {
-        return _OrderCard(order: _orders[index]);
+        final order = _orders[index];
+        return _OrderCard(
+          order: order,
+          cancelling: _cancellingOrderId == order.id,
+          onCancel: () => _cancelOrder(order),
+        );
       },
     );
+  }
+
+  String _extractErrorMessage(DioException error) {
+    final data = error.response?.data;
+
+    if (data is Map<String, dynamic>) {
+      final detail = data['detail'];
+      if (detail != null) return detail.toString();
+    }
+
+    return 'No se pudo cancelar el pedido.';
   }
 }
 
 class _OrderCard extends StatelessWidget {
-  const _OrderCard({required this.order});
+  const _OrderCard({
+    required this.order,
+    required this.cancelling,
+    required this.onCancel,
+  });
 
   final OrderModel order;
+  final bool cancelling;
+  final VoidCallback onCancel;
 
   @override
   Widget build(BuildContext context) {
     final paymentMethod =
         order.paymentMethodDisplay ?? order.paymentMethod ?? 'Sin metodo';
+    final canCancel = order.status.trim().toUpperCase() == 'DRAFT';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -252,6 +319,26 @@ class _OrderCard extends StatelessWidget {
               ...order.details.map(
                 (detail) => OrderDetailCard(detail: detail),
               ),
+            if (canCancel) ...[
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: cancelling ? null : onCancel,
+                  icon: cancelling
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.cancel_outlined),
+                  label: Text(cancelling ? 'Cancelando...' : 'Cancelar pedido'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Theme.of(context).colorScheme.error,
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
