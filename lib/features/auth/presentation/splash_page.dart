@@ -28,7 +28,7 @@ class _SplashPageState extends State<SplashPage> {
     if (!mounted) return;
 
     if (!hasToken) {
-      Navigator.of(context).pushReplacementNamed(AppRoutes.store);
+      Navigator.of(context).pushReplacementNamed(AppRoutes.home);
       return;
     }
 
@@ -36,13 +36,23 @@ class _SplashPageState extends State<SplashPage> {
       final user = await _authService.getMe();
       if (!mounted) return;
 
-      Navigator.of(context).pushReplacementNamed(
-        user.isCustomer ? AppRoutes.store : AppRoutes.customerLogin,
-      );
+      if (user.isCustomer) {
+        Navigator.of(context).pushReplacementNamed(AppRoutes.store);
+        return;
+      }
+
+      if (user.isDelivery) {
+        Navigator.of(context).pushReplacementNamed(AppRoutes.deliveryHome);
+        return;
+      }
+
+      await _authService.logout();
+      if (!mounted) return;
+      Navigator.of(context).pushReplacementNamed(AppRoutes.home);
     } catch (_) {
       await _authService.logout();
       if (!mounted) return;
-      Navigator.of(context).pushReplacementNamed(AppRoutes.customerLogin);
+      Navigator.of(context).pushReplacementNamed(AppRoutes.home);
     }
   }
 
@@ -68,7 +78,7 @@ class _SplashPageState extends State<SplashPage> {
             ),
             const SizedBox(height: 18),
             Text(
-              'ECO Cliente',
+              'EcomSaaS',
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w800,
                   ),

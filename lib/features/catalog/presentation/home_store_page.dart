@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/config/app_routes.dart';
+import '../../../core/storage/token_storage.dart';
+import '../../auth/data/auth_service.dart';
 import '../../cart/state/cart_provider.dart';
 import '../data/catalog_service.dart';
 import '../data/category_model.dart';
@@ -16,8 +18,10 @@ class HomeStorePage extends ConsumerStatefulWidget {
 }
 
 class _HomeStorePageState extends ConsumerState<HomeStorePage> {
+  final _authService = AuthService();
   final _catalogService = CatalogService();
   final _searchController = TextEditingController();
+  final _tokenStorage = TokenStorage();
 
   List<ProductModel> _products = [];
   List<CategoryModel> _categories = [];
@@ -29,7 +33,7 @@ class _HomeStorePageState extends ConsumerState<HomeStorePage> {
   @override
   void initState() {
     super.initState();
-    _loadCatalog();
+    _ensureCustomerSessionAndLoad();
     _searchController.addListener(() {
       setState(() => _query = _searchController.text);
     });
@@ -39,6 +43,44 @@ class _HomeStorePageState extends ConsumerState<HomeStorePage> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _ensureCustomerSessionAndLoad() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    final hasToken = await _tokenStorage.hasAccessToken();
+    if (!mounted) return;
+
+    if (!hasToken) {
+      Navigator.of(context).pushReplacementNamed(AppRoutes.home);
+      return;
+    }
+
+    try {
+      final user = await _authService.getMe();
+      if (!mounted) return;
+
+      if (user.isDelivery) {
+        Navigator.of(context).pushReplacementNamed(AppRoutes.deliveryHome);
+        return;
+      }
+
+      if (!user.isCustomer) {
+        await _authService.logout();
+        if (!mounted) return;
+        Navigator.of(context).pushReplacementNamed(AppRoutes.home);
+        return;
+      }
+
+      await _loadCatalog();
+    } catch (_) {
+      await _authService.logout();
+      if (!mounted) return;
+      Navigator.of(context).pushReplacementNamed(AppRoutes.home);
+    }
   }
 
   Future<void> _loadCatalog() async {
@@ -105,7 +147,7 @@ class _HomeStorePageState extends ConsumerState<HomeStorePage> {
         title: const Text('Tienda'),
         actions: [
           IconButton(
-            onPressed: _loadCatalog,
+            onPressed: _ensureCustomerSessionAndLoad,
             icon: const Icon(Icons.refresh),
             tooltip: 'Actualizar',
           ),
@@ -123,12 +165,17 @@ class _HomeStorePageState extends ConsumerState<HomeStorePage> {
             icon: const Icon(Icons.receipt_long_outlined),
             tooltip: 'Mis pedidos',
           ),
+          IconButton(
+            onPressed: _logout,
+            icon: const Icon(Icons.logout),
+            tooltip: 'Cerrar sesion',
+          ),
           _CartIconButton(totalItems: totalItems),
         ],
       ),
       body: SafeArea(
         child: RefreshIndicator(
-          onRefresh: _loadCatalog,
+          onRefresh: _ensureCustomerSessionAndLoad,
           child: _buildBody(products),
         ),
       ),
@@ -154,7 +201,7 @@ class _HomeStorePageState extends ConsumerState<HomeStorePage> {
           ),
           const SizedBox(height: 16),
           FilledButton(
-            onPressed: _loadCatalog,
+            onPressed: _ensureCustomerSessionAndLoad,
             child: const Text('Reintentar'),
           ),
         ],
@@ -211,6 +258,17 @@ class _HomeStorePageState extends ConsumerState<HomeStorePage> {
             },
           ),
       ],
+    );
+  }
+
+  Future<void> _logout() async {
+    await _authService.logout();
+    await ref.read(cartProvider.notifier).clear();
+
+    if (!mounted) return;
+    Navigator.of(context).pushNamedAndRemoveUntil(
+      AppRoutes.home,
+      (_) => false,
     );
   }
 }

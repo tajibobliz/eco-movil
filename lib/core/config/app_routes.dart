@@ -1,9 +1,16 @@
 class AppRoutes {
   const AppRoutes._();
 
+  static const home = '/';
   static const splash = '/splash';
   static const customerLogin = '/cliente/login';
   static const customerRegister = '/cliente/register';
+  static const deliveryLogin = '/delivery/login';
+  static const deliveryHome = '/delivery/home';
+  static const deliveryStores = '/delivery/tiendas';
+  static const deliveryAssignments = '/delivery/pedidos';
+  static const deliveryConfirm = '/delivery/confirmar';
+  static const deliveryStatus = '/delivery/estado';
   static const customerProfile = '/cliente/perfil';
   static const store = '/tienda';
   static const myOrders = '/cliente/mis-pedidos';

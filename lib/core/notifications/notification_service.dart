@@ -25,6 +25,7 @@ class NotificationService {
     await _requestPermission();
     final token = await _printFcmToken();
     await registerCurrentTokenIfAuthenticated(token: token);
+    _listenTokenRefresh();
     _listenForegroundMessages();
   }
 
@@ -90,6 +91,12 @@ class NotificationService {
     } catch (error) {
       debugPrint('FCM TOKEN REGISTER ERROR: $error');
     }
+  }
+
+  static void _listenTokenRefresh() {
+    _messaging.onTokenRefresh.listen((token) async {
+      await registerCurrentTokenIfAuthenticated(token: token);
+    });
   }
 
   static void _listenForegroundMessages() {

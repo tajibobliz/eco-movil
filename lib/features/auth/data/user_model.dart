@@ -39,6 +39,11 @@ class UserModel {
 
   bool get isCustomer => userType.toUpperCase() == 'CUSTOMER';
 
+  bool get isDelivery {
+    final normalized = userType.toUpperCase();
+    return normalized == 'DELIVERY' || normalized == 'DELIVERY_PERSON';
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,

@@ -54,7 +54,7 @@ class _CustomerProfilePageState extends ConsumerState<CustomerProfilePage> {
     final hasToken = await _tokenStorage.hasAccessToken();
     if (!hasToken) {
       if (!mounted) return;
-      Navigator.of(context).pushReplacementNamed(AppRoutes.customerLogin);
+      Navigator.of(context).pushReplacementNamed(AppRoutes.home);
       return;
     }
 
@@ -70,7 +70,7 @@ class _CustomerProfilePageState extends ConsumerState<CustomerProfilePage> {
       if (error is DioException &&
           (error.response?.statusCode == 401 ||
               error.response?.statusCode == 403)) {
-        Navigator.of(context).pushReplacementNamed(AppRoutes.customerLogin);
+        Navigator.of(context).pushReplacementNamed(AppRoutes.home);
         return;
       }
 
@@ -115,7 +115,7 @@ class _CustomerProfilePageState extends ConsumerState<CustomerProfilePage> {
 
     if (!mounted) return;
     Navigator.of(context).pushNamedAndRemoveUntil(
-      AppRoutes.store,
+      AppRoutes.home,
       (_) => false,
     );
   }
