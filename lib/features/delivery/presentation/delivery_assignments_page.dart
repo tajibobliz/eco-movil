@@ -27,24 +27,29 @@ class _DeliveryAssignmentsPageState extends State<DeliveryAssignmentsPage> {
   @override
   void initState() {
     super.initState();
-    _loadAssignments();
+    _loadAssignments(showLoading: true);
   }
 
-  Future<void> _loadAssignments() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  Future<void> _loadAssignments({bool showLoading = false}) async {
+    if (showLoading) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
 
     try {
       final assignments = await _deliveryService.getAssignments();
       if (!mounted) return;
-      setState(() => _assignments = assignments);
+      setState(() {
+        _assignments = assignments;
+        _error = null;
+      });
     } catch (_) {
       if (!mounted) return;
       setState(() => _error = 'No se pudieron cargar tus pedidos asignados.');
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && showLoading) setState(() => _loading = false);
     }
   }
 
@@ -82,17 +87,19 @@ class _DeliveryAssignmentsPageState extends State<DeliveryAssignmentsPage> {
   ) async {
     if (_workingId != null) return;
 
+    FocusManager.instance.primaryFocus?.unfocus();
+    final messenger = ScaffoldMessenger.of(context);
     setState(() => _workingId = id);
     try {
       await action();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(content: Text(successMessage)),
       );
       await _loadAssignments();
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         const SnackBar(content: Text('No se pudo actualizar la entrega.')),
       );
     } finally {
@@ -142,7 +149,7 @@ class _DeliveryAssignmentsPageState extends State<DeliveryAssignmentsPage> {
         title: Text(title),
         actions: [
           IconButton(
-            onPressed: _loadAssignments,
+            onPressed: () => _loadAssignments(showLoading: true),
             icon: const Icon(Icons.refresh),
             tooltip: 'Actualizar',
           ),
@@ -150,7 +157,7 @@ class _DeliveryAssignmentsPageState extends State<DeliveryAssignmentsPage> {
       ),
       body: SafeArea(
         child: RefreshIndicator(
-          onRefresh: _loadAssignments,
+          onRefresh: () => _loadAssignments(showLoading: false),
           child: _buildBody(),
         ),
       ),
@@ -167,7 +174,7 @@ class _DeliveryAssignmentsPageState extends State<DeliveryAssignmentsPage> {
         icon: Icons.assignment_outlined,
         message: _error!,
         action: FilledButton(
-          onPressed: _loadAssignments,
+          onPressed: () => _loadAssignments(showLoading: true),
           child: const Text('Reintentar'),
         ),
       );
@@ -181,12 +188,20 @@ class _DeliveryAssignmentsPageState extends State<DeliveryAssignmentsPage> {
     }
 
     return ListView.separated(
+      key: PageStorageKey<String>(
+        widget.confirmMode
+            ? 'delivery-confirm-assignments'
+            : 'delivery-active-assignments',
+      ),
       padding: const EdgeInsets.all(16),
       itemCount: _assignments.length,
       separatorBuilder: (_, __) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final assignment = _assignments[index];
         return _AssignmentCard(
+          key: ValueKey<String>(
+            '${widget.confirmMode ? 'confirm' : 'assign'}-${assignment.id}-${assignment.status}',
+          ),
           assignment: assignment,
           working: _workingId == assignment.id,
           confirmMode: widget.confirmMode,
@@ -201,6 +216,7 @@ class _DeliveryAssignmentsPageState extends State<DeliveryAssignmentsPage> {
 
 class _AssignmentCard extends StatelessWidget {
   const _AssignmentCard({
+    super.key,
     required this.assignment,
     required this.working,
     required this.confirmMode,
