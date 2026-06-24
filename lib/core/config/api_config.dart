@@ -7,7 +7,7 @@ class ApiConfig {
 
   static String get baseUrl {
     if (_configuredBaseUrl.isNotEmpty) return _configuredBaseUrl;
-    if (kIsWeb) return 'http://127.0.0.1:8000/api/v1';
-    return 'http://192.168.0.6:8000/api/v1';
+    // Hardcoded para defensa: apunta a Railway producción
+    return 'https://eco-backend-production-8c5a.up.railway.app/api/v1';
   }
 }
