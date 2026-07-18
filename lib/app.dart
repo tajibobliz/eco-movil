@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'core/config/app_routes.dart';
+import 'core/config/nav_key.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/presentation/customer_login_page.dart';
 import 'features/auth/presentation/customer_register_page.dart';
@@ -17,6 +18,8 @@ import 'features/delivery/presentation/delivery_stores_page.dart';
 import 'features/home/presentation/welcome_page.dart';
 import 'features/orders/presentation/my_orders_page.dart';
 import 'features/profile/presentation/customer_profile_page.dart';
+import 'features/support/presentation/mis_tickets_page.dart';
+import 'features/support/presentation/ticket_detalle_page.dart';
 
 class EcoCustomerApp extends StatelessWidget {
   const EcoCustomerApp({super.key});
@@ -27,6 +30,7 @@ class EcoCustomerApp extends StatelessWidget {
       title: 'EcomSaaS',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
+      navigatorKey: appNavigatorKey,
       initialRoute: AppRoutes.splash,
       routes: {
         AppRoutes.home: (_) => const WelcomePage(),
@@ -46,6 +50,7 @@ class EcoCustomerApp extends StatelessWidget {
         AppRoutes.cart: (_) => const CartPage(),
         AppRoutes.checkout: (_) => const CheckoutPage(),
         CheckoutSuccessPage.routeName: (_) => const CheckoutSuccessPage(),
+        AppRoutes.mySupport: (_) => const MisTicketsPage(),
       },
       onGenerateRoute: (settings) {
         if (settings.name == AppRoutes.productDetail &&
@@ -53,6 +58,15 @@ class EcoCustomerApp extends StatelessWidget {
           return MaterialPageRoute<void>(
             builder: (_) => ProductDetailPage(
               args: settings.arguments! as ProductDetailArgs,
+            ),
+          );
+        }
+
+        if (settings.name == AppRoutes.ticketDetail &&
+            settings.arguments is int) {
+          return MaterialPageRoute<void>(
+            builder: (_) => TicketDetallePage(
+              ticketId: settings.arguments! as int,
             ),
           );
         }

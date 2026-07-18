@@ -81,6 +81,22 @@ _StatusStyle _statusStyle(String? rawStatus) {
         border: Color(0xFFFCA5A5),
         icon: Icons.cancel_outlined,
       );
+    case 'DELIVERED':
+      return const _StatusStyle(
+        label: 'Entregado',
+        foreground: Color(0xFF166534),
+        background: Color(0xFFBBF7D0),
+        border: Color(0xFF4ADE80),
+        icon: Icons.local_shipping_outlined,
+      );
+    case 'PENDING':
+      return const _StatusStyle(
+        label: 'Pendiente',
+        foreground: Color(0xFF92400E),
+        background: Color(0xFFFEF3C7),
+        border: Color(0xFFFCD34D),
+        icon: Icons.hourglass_empty_outlined,
+      );
     case 'PAID':
       return const _StatusStyle(
         label: 'Pagado',

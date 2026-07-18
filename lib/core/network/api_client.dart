@@ -1,6 +1,9 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/scheduler.dart';
 
 import '../config/api_config.dart';
+import '../config/app_routes.dart';
+import '../config/nav_key.dart';
 import '../storage/token_storage.dart';
 
 class ApiClient {
@@ -85,7 +88,24 @@ class ApiClient {
       return access;
     } on DioException {
       await _tokenStorage.clear();
+      _scheduleLogout();
       return null;
     }
+  }
+
+  // Flag para evitar multiples redirects simultaneos si varias peticiones
+  // fallan al mismo tiempo con refresh expirado.
+  static bool _loggingOut = false;
+
+  static void _scheduleLogout() {
+    if (_loggingOut) return;
+    _loggingOut = true;
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      appNavigatorKey.currentState?.pushNamedAndRemoveUntil(
+        AppRoutes.home,
+        (_) => false,
+      );
+      _loggingOut = false;
+    });
   }
 }

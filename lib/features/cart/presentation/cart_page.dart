@@ -236,13 +236,13 @@ class _CartSummary extends StatelessWidget {
       top: false,
       child: Container(
         padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
-        decoration: const BoxDecoration(
-          color: Colors.white,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
           boxShadow: [
             BoxShadow(
               blurRadius: 18,
-              color: Color(0x1A000000),
-              offset: Offset(0, -6),
+              color: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.10),
+              offset: const Offset(0, -6),
             ),
           ],
         ),

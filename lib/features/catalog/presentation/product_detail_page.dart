@@ -15,7 +15,7 @@ class ProductDetailArgs {
   final String? categoryName;
 }
 
-class ProductDetailPage extends ConsumerWidget {
+class ProductDetailPage extends ConsumerStatefulWidget {
   const ProductDetailPage({
     required this.args,
     super.key,
@@ -24,8 +24,16 @@ class ProductDetailPage extends ConsumerWidget {
   final ProductDetailArgs args;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final product = args.product;
+  ConsumerState<ProductDetailPage> createState() => _ProductDetailPageState();
+}
+
+class _ProductDetailPageState extends ConsumerState<ProductDetailPage> {
+  int _quantity = 1;
+
+  @override
+  Widget build(BuildContext context) {
+    final product = widget.args.product;
+    final subtotal = product.price * _quantity;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Detalle de producto')),
@@ -47,17 +55,31 @@ class ProductDetailPage extends ConsumerWidget {
                 'SKU: ${product.sku}',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
-            if (args.categoryName != null) ...[
+            if (widget.args.categoryName != null) ...[
               const SizedBox(height: 8),
-              Chip(label: Text(args.categoryName!)),
+              Chip(label: Text(widget.args.categoryName!)),
             ],
             const SizedBox(height: 16),
-            Text(
-              'Bs ${product.price.toStringAsFixed(2)}',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    color: Theme.of(context).colorScheme.primary,
-                    fontWeight: FontWeight.w900,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  'Bs ${product.price.toStringAsFixed(2)}',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.w900,
+                      ),
+                ),
+                if (_quantity > 1) ...[
+                  const SizedBox(width: 8),
+                  Text(
+                    '× $_quantity = Bs ${subtotal.toStringAsFixed(2)}',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
                   ),
+                ],
+              ],
             ),
             const SizedBox(height: 22),
             Text(
@@ -67,13 +89,48 @@ class ProductDetailPage extends ConsumerWidget {
               style: Theme.of(context).textTheme.bodyLarge,
             ),
             const SizedBox(height: 28),
+            Row(
+              children: [
+                Text(
+                  'Cantidad',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+                const Spacer(),
+                IconButton.outlined(
+                  onPressed: _quantity > 1
+                      ? () => setState(() => _quantity--)
+                      : null,
+                  icon: const Icon(Icons.remove),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Text(
+                    '$_quantity',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                  ),
+                ),
+                IconButton.outlined(
+                  onPressed: () => setState(() => _quantity++),
+                  icon: const Icon(Icons.add),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
             FilledButton.icon(
               onPressed: () async {
-                await ref.read(cartProvider.notifier).addProduct(product);
+                await ref
+                    .read(cartProvider.notifier)
+                    .addProduct(product, quantity: _quantity);
                 if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('${product.name} agregado al carrito.'),
+                    content: Text(
+                      '$_quantity × ${product.name} agregado al carrito.',
+                    ),
                     action: SnackBarAction(
                       label: 'Ver',
                       onPressed: () {

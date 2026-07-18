@@ -17,4 +17,6 @@ class AppRoutes {
   static const productDetail = '/producto/detalle';
   static const cart = '/carrito';
   static const checkout = '/checkout';
+  static const mySupport = '/cliente/soporte';
+  static const ticketDetail = '/cliente/soporte/ticket';
 }

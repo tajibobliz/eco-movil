@@ -1,12 +1,14 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
 
 import '../../../core/config/app_routes.dart';
 import '../../../core/storage/token_storage.dart';
 import '../../orders/data/order_model.dart';
 import '../../orders/data/orders_service.dart';
-import '../../orders/presentation/order_status_chip.dart';
+import '../../payment/data/payment_gateway_model.dart';
+import '../../payment/data/payment_service.dart';
 import '../state/cart_provider.dart';
 
 class CheckoutPage extends ConsumerStatefulWidget {
@@ -18,13 +20,53 @@ class CheckoutPage extends ConsumerStatefulWidget {
 
 class _CheckoutPageState extends ConsumerState<CheckoutPage> {
   final _ordersService = OrdersService();
+  final _paymentService = PaymentService();
   final _tokenStorage = TokenStorage();
+  final _notesController = TextEditingController();
 
+  List<PaymentGatewayModel> _gateways = [];
+  PaymentGatewayModel? _selectedGateway;
+  bool _loadingGateways = true;
   bool _processing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadGateways();
+  }
+
+  @override
+  void dispose() {
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadGateways() async {
+    try {
+      final gateways = await _paymentService.getStorePaymentMethods();
+      if (!mounted) return;
+      final list = gateways.isEmpty ? PaymentGatewayModel.defaults : gateways;
+      setState(() {
+        _gateways = list;
+        _selectedGateway = list.first;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      // Si falla la carga, usar lista estática de fallback.
+      final fallback = PaymentGatewayModel.defaults;
+      setState(() {
+        _gateways = fallback;
+        _selectedGateway = fallback.first;
+      });
+    } finally {
+      if (mounted) setState(() => _loadingGateways = false);
+    }
+  }
 
   Future<void> _submitCheckout() async {
     final cart = ref.read(cartProvider);
-    if (cart.items.isEmpty || _processing) return;
+    final gateway = _selectedGateway;
+    if (cart.items.isEmpty || _processing || gateway == null) return;
 
     final hasToken = await _tokenStorage.hasAccessToken();
     if (!hasToken) {
@@ -36,19 +78,24 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
     setState(() => _processing = true);
 
     try {
-      final order = await _ordersService.createOrder();
+      final notes = _notesController.text.trim();
+      final order = await _ordersService.createOrder(
+        notes: notes.isEmpty ? 'Pedido creado desde app móvil cliente' : notes,
+      );
 
       for (final item in cart.items) {
-        await _ordersService.createOrderDetail(
-          orderId: order.id,
-          item: item,
-        );
+        await _ordersService.createOrderDetail(orderId: order.id, item: item);
       }
 
-      await _ordersService.createPayment(
-        orderId: order.id,
-        amount: cart.totalAmount,
-      );
+      if (gateway.isStripe) {
+        await _processStripePayment(order: order, gateway: gateway);
+      } else {
+        await _ordersService.createPayment(
+          orderId: order.id,
+          amount: cart.totalAmount,
+          paymentMethod: gateway.gateway,
+        );
+      }
 
       await ref.read(cartProvider.notifier).clear();
 
@@ -56,8 +103,17 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
       Navigator.of(context).pushNamedAndRemoveUntil(
         CheckoutSuccessPage.routeName,
         (_) => false,
-        arguments: order,
+        arguments: _CheckoutSuccessArgs(
+          order: order,
+          isStripe: gateway.isStripe,
+        ),
       );
+    } on StripeException catch (e) {
+      if (!mounted) return;
+      final msg = e.error.code == FailureCode.Canceled
+          ? 'Pago cancelado.'
+          : e.error.message ?? 'Error al procesar el pago con tarjeta.';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -68,6 +124,32 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
     }
   }
 
+  Future<void> _processStripePayment({
+    required OrderModel order,
+    required PaymentGatewayModel gateway,
+  }) async {
+    // Configurar la publishable key de ESTA empresa (multi-tenant).
+    Stripe.publishableKey = gateway.publishableKey;
+    await Stripe.instance.applySettings();
+
+    final intent = await _paymentService.createPaymentIntent(order.id);
+    final clientSecret = intent['client_secret'] ?? '';
+
+    await Stripe.instance.initPaymentSheet(
+      paymentSheetData: SetupPaymentSheetParameters(
+        paymentIntentClientSecret: clientSecret,
+        merchantDisplayName: 'ECO Store',
+        style: MediaQuery.of(context).platformBrightness == Brightness.dark
+            ? ThemeMode.dark
+            : ThemeMode.light,
+      ),
+    );
+
+    // Lanza StripeException si el usuario cancela o hay error de pago.
+    await Stripe.instance.presentPaymentSheet();
+    // El webhook de Stripe confirma el pedido automaticamente.
+  }
+
   String _readError(Object error) {
     if (error is DioException) {
       final status = error.response?.statusCode;
@@ -75,17 +157,17 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
       final text = data?.toString().toLowerCase() ?? '';
 
       if (status == 401 || status == 403) {
-        return 'Tu sesion expiro o no tienes permiso para comprar. Vuelve a iniciar sesion.';
+        return 'Tu sesion expiro o no tienes permiso para comprar.';
       }
-
       if (text.contains('assigned store')) {
-        return 'Tu cuenta no esta asociada a esta tienda. Vuelve a iniciar sesion o registrate desde la tienda.';
+        return 'Tu cuenta no esta asociada a esta tienda.';
       }
-
       if (text.contains('warehouse')) {
-        return 'No se pudo asociar el almacen predeterminado al pedido.';
+        return 'No se pudo asociar el almacen al pedido.';
       }
-
+      if (text.contains('stripe') || text.contains('pasarela')) {
+        return data?.toString() ?? 'Error al iniciar el pago con tarjeta.';
+      }
       if (data != null) return data.toString();
     }
 
@@ -164,34 +246,35 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
                     ),
                   ),
                   const SizedBox(height: 18),
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.payments_outlined,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                          const SizedBox(width: 12),
-                          const Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('Pago simulado'),
-                                SizedBox(height: 4),
-                                Text('Metodo: efectivo'),
-                              ],
-                            ),
-                          ),
-                          const OrderStatusChip(status: 'PAID'),
-                        ],
-                      ),
+                  _DynamicPaymentSelector(
+                    gateways: _gateways,
+                    selected: _selectedGateway,
+                    loading: _loadingGateways,
+                    onChanged: (g) => setState(() => _selectedGateway = g),
+                  ),
+                  const SizedBox(height: 18),
+                  Text(
+                    'Instrucciones de entrega',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _notesController,
+                    maxLines: 3,
+                    maxLength: 200,
+                    decoration: const InputDecoration(
+                      hintText: 'Ej: Dejar en recepcion, llamar al llegar...',
+                      border: OutlineInputBorder(),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 8),
                   FilledButton.icon(
-                    onPressed: _processing ? null : _submitCheckout,
+                    onPressed:
+                        (_processing || _loadingGateways || _selectedGateway == null)
+                            ? null
+                            : _submitCheckout,
                     icon: _processing
                         ? const SizedBox(
                             width: 18,
@@ -210,6 +293,108 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Datos para la pantalla de éxito
+// ---------------------------------------------------------------------------
+
+class _CheckoutSuccessArgs {
+  const _CheckoutSuccessArgs({required this.order, this.isStripe = false});
+  final OrderModel order;
+  final bool isStripe;
+}
+
+// ---------------------------------------------------------------------------
+// Selector dinámico de métodos de pago
+// ---------------------------------------------------------------------------
+
+class _DynamicPaymentSelector extends StatelessWidget {
+  const _DynamicPaymentSelector({
+    required this.gateways,
+    required this.selected,
+    required this.loading,
+    required this.onChanged,
+  });
+
+  final List<PaymentGatewayModel> gateways;
+  final PaymentGatewayModel? selected;
+  final bool loading;
+  final ValueChanged<PaymentGatewayModel> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.primary;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Metodo de pago',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+        ),
+        const SizedBox(height: 8),
+        Card(
+          child: loading
+              ? const Padding(
+                  padding: EdgeInsets.all(20),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              : Column(
+                  children: [
+                    for (final gateway in gateways)
+                      ListTile(
+                        leading: Icon(
+                          selected?.gateway == gateway.gateway
+                              ? Icons.radio_button_checked
+                              : Icons.radio_button_unchecked,
+                          color: selected?.gateway == gateway.gateway
+                              ? color
+                              : null,
+                        ),
+                        title: Text(gateway.displayName),
+                        trailing: Icon(
+                          gateway.icon,
+                          color: selected?.gateway == gateway.gateway
+                              ? color
+                              : null,
+                        ),
+                        onTap: () => onChanged(gateway),
+                        dense: true,
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 12),
+                      ),
+                  ],
+                ),
+        ),
+        if (selected?.isStripe == true) ...[
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Icon(
+                Icons.lock_outline,
+                size: 14,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                'Pago seguro procesado por Stripe',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Pantalla de éxito
+// ---------------------------------------------------------------------------
+
 class CheckoutSuccessPage extends StatelessWidget {
   const CheckoutSuccessPage({super.key});
 
@@ -217,8 +402,10 @@ class CheckoutSuccessPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final order = ModalRoute.of(context)?.settings.arguments;
-    final orderId = order is OrderModel ? order.id : null;
+    final args = ModalRoute.of(context)?.settings.arguments;
+    final successArgs = args is _CheckoutSuccessArgs ? args : null;
+    final orderId = successArgs?.order.id;
+    final isStripe = successArgs?.isStripe ?? false;
 
     return Scaffold(
       body: SafeArea(
@@ -245,7 +432,9 @@ class CheckoutSuccessPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  'Tu compra fue creada correctamente. El administrador confirmara el pedido.',
+                  isStripe
+                      ? 'Tu pago fue procesado por Stripe. La tienda confirmara el pedido en breve.'
+                      : 'Tu compra fue creada correctamente. El administrador confirmara el pedido.',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
@@ -274,6 +463,8 @@ class CheckoutSuccessPage extends StatelessWidget {
     );
   }
 }
+
+// ---------------------------------------------------------------------------
 
 class _EmptyCheckout extends StatelessWidget {
   const _EmptyCheckout();

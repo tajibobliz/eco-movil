@@ -72,15 +72,15 @@ class CartNotifier extends Notifier<CartState> {
     }
   }
 
-  Future<void> addProduct(ProductModel product) async {
+  Future<void> addProduct(ProductModel product, {int quantity = 1}) async {
     final items = [...state.items];
     final index = items.indexWhere((item) => item.productId == product.id);
 
     if (index >= 0) {
       final current = items[index];
-      items[index] = current.copyWith(quantity: current.quantity + 1);
+      items[index] = current.copyWith(quantity: current.quantity + quantity);
     } else {
-      items.add(CartItemModel.fromProduct(product));
+      items.add(CartItemModel.fromProduct(product, quantity: quantity));
     }
 
     await _setItems(items);

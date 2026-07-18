@@ -166,6 +166,13 @@ class _HomeStorePageState extends ConsumerState<HomeStorePage> {
             tooltip: 'Mis pedidos',
           ),
           IconButton(
+            onPressed: () {
+              Navigator.of(context).pushNamed(AppRoutes.mySupport);
+            },
+            icon: const Icon(Icons.support_agent_outlined),
+            tooltip: 'Soporte',
+          ),
+          IconButton(
             onPressed: _logout,
             icon: const Icon(Icons.logout),
             tooltip: 'Cerrar sesion',

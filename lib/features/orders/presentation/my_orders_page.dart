@@ -20,9 +20,17 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
   final _tokenStorage = TokenStorage();
 
   List<OrderModel> _orders = [];
+  String? _selectedStatus;
   bool _loading = true;
   int? _cancellingOrderId;
   String? _error;
+
+  List<OrderModel> get _filteredOrders {
+    if (_selectedStatus == null) return _orders;
+    return _orders
+        .where((o) => o.status.trim().toUpperCase() == _selectedStatus)
+        .toList();
+  }
 
   @override
   void initState() {
@@ -130,6 +138,13 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
             tooltip: 'Mi perfil',
           ),
           IconButton(
+            onPressed: () {
+              Navigator.of(context).pushNamed(AppRoutes.mySupport);
+            },
+            icon: const Icon(Icons.support_agent_outlined),
+            tooltip: 'Soporte',
+          ),
+          IconButton(
             onPressed: _loadOrders,
             icon: const Icon(Icons.refresh),
             tooltip: 'Actualizar',
@@ -206,17 +221,57 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _orders.length,
-      itemBuilder: (context, index) {
-        final order = _orders[index];
-        return _OrderCard(
-          order: order,
-          cancelling: _cancellingOrderId == order.id,
-          onCancel: () => _cancelOrder(order),
-        );
-      },
+    final filtered = _filteredOrders;
+
+    return Column(
+      children: [
+        _StatusFilterChips(
+          selected: _selectedStatus,
+          onSelected: (status) => setState(() => _selectedStatus = status),
+        ),
+        Expanded(
+          child: filtered.isEmpty
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.filter_list_off,
+                          size: 58,
+                          color: Colors.grey,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'No hay pedidos con ese estado.',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodyLarge,
+                        ),
+                        const SizedBox(height: 12),
+                        TextButton(
+                          onPressed: () =>
+                              setState(() => _selectedStatus = null),
+                          child: const Text('Ver todos'),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                  itemCount: filtered.length,
+                  itemBuilder: (context, index) {
+                    final order = filtered[index];
+                    return _OrderCard(
+                      order: order,
+                      cancelling: _cancellingOrderId == order.id,
+                      onCancel: () => _cancelOrder(order),
+                    );
+                  },
+                ),
+        ),
+      ],
     );
   }
 
@@ -369,6 +424,45 @@ class _InfoChip extends StatelessWidget {
       avatar: Icon(icon, size: 16),
       label: Text(text),
       visualDensity: VisualDensity.compact,
+    );
+  }
+}
+
+class _StatusFilterChips extends StatelessWidget {
+  const _StatusFilterChips({
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final String? selected;
+  final ValueChanged<String?> onSelected;
+
+  static const _filters = [
+    (null, 'Todos'),
+    ('DRAFT', 'Pendiente'),
+    ('CONFIRMED', 'Confirmado'),
+    ('DELIVERED', 'Entregado'),
+    ('CANCELLED', 'Cancelado'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        children: [
+          for (final (value, label) in _filters)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ChoiceChip(
+                label: Text(label),
+                selected: selected == value,
+                onSelected: (_) => onSelected(value),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

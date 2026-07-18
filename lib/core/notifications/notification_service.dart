@@ -1,7 +1,11 @@
+import 'dart:convert';
+
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
+import '../config/app_routes.dart';
+import '../config/nav_key.dart';
 import '../network/api_client.dart';
 import '../storage/token_storage.dart';
 
@@ -27,6 +31,7 @@ class NotificationService {
     await registerCurrentTokenIfAuthenticated(token: token);
     _listenTokenRefresh();
     _listenForegroundMessages();
+    _listenBackgroundTap();
   }
 
   static Future<void> _initializeLocalNotifications() async {
@@ -37,7 +42,10 @@ class NotificationService {
       android: androidSettings,
     );
 
-    await _localNotifications.initialize(settings: initializationSettings);
+    await _localNotifications.initialize(
+      settings: initializationSettings,
+      onDidReceiveNotificationResponse: _onLocalNotificationTap,
+    );
 
     await _localNotifications
         .resolvePlatformSpecificImplementation<
@@ -111,12 +119,62 @@ class NotificationService {
     });
   }
 
+  // Escucha toques en notificaciones cuando la app esta en background.
+  static void _listenBackgroundTap() {
+    FirebaseMessaging.onMessageOpenedApp.listen(_navigateFromMessage);
+  }
+
+  // Tap en notificacion local (foreground) — el payload es el data del mensaje
+  // serializado como JSON por _showForegroundNotification.
+  static void _onLocalNotificationTap(NotificationResponse response) {
+    final payload = response.payload;
+    if (payload == null || payload.isEmpty) {
+      _navigateDefault();
+      return;
+    }
+    try {
+      final data = jsonDecode(payload) as Map<String, dynamic>;
+      _navigateFromData(data);
+    } catch (_) {
+      _navigateDefault();
+    }
+  }
+
+  // Navega segun los datos del mensaje FCM.
+  static void _navigateFromMessage(RemoteMessage message) {
+    _navigateFromData(message.data);
+  }
+
+  static void _navigateFromData(Map<String, dynamic> data) {
+    final ticketId = int.tryParse(data['ticket_id']?.toString() ?? '');
+    if (ticketId != null) {
+      appNavigatorKey.currentState?.pushNamed(
+        AppRoutes.ticketDetail,
+        arguments: ticketId,
+      );
+      return;
+    }
+    _navigateDefault();
+  }
+
+  // Destino por defecto: Mis pedidos.
+  static void _navigateDefault() {
+    appNavigatorKey.currentState?.pushNamed(AppRoutes.myOrders);
+  }
+
   static Future<void> _showForegroundNotification(RemoteMessage message) async {
     final notification = message.notification;
     final title = notification?.title;
     final body = notification?.body;
 
     if (title == null && body == null) return;
+
+    // Serializa el data del mensaje como payload para que _onLocalNotificationTap
+    // pueda determinar a donde navegar cuando el usuario toca la notificacion.
+    String? payload;
+    try {
+      if (message.data.isNotEmpty) payload = jsonEncode(message.data);
+    } catch (_) {}
 
     await _localNotifications.show(
       id: message.hashCode,
@@ -132,6 +190,7 @@ class NotificationService {
           icon: '@mipmap/ic_launcher',
         ),
       ),
+      payload: payload,
     );
   }
 }
