@@ -7,7 +7,7 @@ import 'product_model.dart';
 class CatalogService {
   CatalogService({Dio? dio}) : _dio = dio ?? ApiClient.instance.dio;
 
-  static const defaultStoreId = 1;
+  static const defaultStoreId = 57;
 
   final Dio _dio;
 

@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_stripe/flutter_stripe.dart';
+import 'package:flutter_stripe/flutter_stripe.dart' as stripe;
 
 import '../../../core/config/app_routes.dart';
 import '../../../core/storage/token_storage.dart';
@@ -90,11 +90,9 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
       if (gateway.isStripe) {
         await _processStripePayment(order: order, gateway: gateway);
       } else {
-        await _ordersService.createPayment(
-          orderId: order.id,
-          amount: cart.totalAmount,
-          paymentMethod: gateway.gateway,
-        );
+        // POST /sales/orders/{id}/pay/ — endpoint correcto para CUSTOMER.
+        // Descuenta stock y confirma la orden en una operación atómica.
+        await _ordersService.payOrder(order.id);
       }
 
       await ref.read(cartProvider.notifier).clear();
@@ -108,9 +106,9 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
           isStripe: gateway.isStripe,
         ),
       );
-    } on StripeException catch (e) {
+    } on stripe.StripeException catch (e) {
       if (!mounted) return;
-      final msg = e.error.code == FailureCode.Canceled
+      final msg = e.error.code == stripe.FailureCode.Canceled
           ? 'Pago cancelado.'
           : e.error.message ?? 'Error al procesar el pago con tarjeta.';
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
@@ -128,25 +126,27 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
     required OrderModel order,
     required PaymentGatewayModel gateway,
   }) async {
+    // Capturar brightness antes de cualquier await para no cruzar async gaps
+    // con una referencia a BuildContext (lint: use_build_context_synchronously).
+    final isDark = MediaQuery.of(context).platformBrightness == Brightness.dark;
+
     // Configurar la publishable key de ESTA empresa (multi-tenant).
-    Stripe.publishableKey = gateway.publishableKey;
-    await Stripe.instance.applySettings();
+    stripe.Stripe.publishableKey = gateway.publishableKey;
+    await stripe.Stripe.instance.applySettings();
 
     final intent = await _paymentService.createPaymentIntent(order.id);
     final clientSecret = intent['client_secret'] ?? '';
 
-    await Stripe.instance.initPaymentSheet(
-      paymentSheetData: SetupPaymentSheetParameters(
+    await stripe.Stripe.instance.initPaymentSheet(
+      paymentSheetParameters: stripe.SetupPaymentSheetParameters(
         paymentIntentClientSecret: clientSecret,
         merchantDisplayName: 'ECO Store',
-        style: MediaQuery.of(context).platformBrightness == Brightness.dark
-            ? ThemeMode.dark
-            : ThemeMode.light,
+        style: isDark ? ThemeMode.dark : ThemeMode.light,
       ),
     );
 
-    // Lanza StripeException si el usuario cancela o hay error de pago.
-    await Stripe.instance.presentPaymentSheet();
+    // Lanza stripe.StripeException si el usuario cancela o hay error de pago.
+    await stripe.Stripe.instance.presentPaymentSheet();
     // El webhook de Stripe confirma el pedido automaticamente.
   }
 

@@ -6,7 +6,7 @@ import 'payment_gateway_model.dart';
 class PaymentService {
   PaymentService({Dio? dio}) : _dio = dio ?? ApiClient.instance.dio;
 
-  static const _defaultStoreId = 1;
+  static const _defaultStoreId = 57;
 
   final Dio _dio;
 

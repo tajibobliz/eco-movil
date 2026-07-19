@@ -7,8 +7,8 @@ import 'order_model.dart';
 class OrdersService {
   OrdersService({Dio? dio}) : _dio = dio ?? ApiClient.instance.dio;
 
-  static const defaultStoreId = 1;
-  static const defaultWarehouseId = 1;
+  static const defaultStoreId = 57;
+  static const defaultWarehouseId = 45;
 
   final Dio _dio;
 
@@ -59,23 +59,11 @@ class OrdersService {
     );
   }
 
-  Future<void> createPayment({
-    required int orderId,
-    required double amount,
-    String paymentMethod = 'CASH',
-    String status = 'PAID',
-    String reference = 'Pago app móvil',
-  }) async {
-    await _dio.post<Map<String, dynamic>>(
-      '/sales/payments/',
-      data: {
-        'order': orderId,
-        'payment_method': paymentMethod,
-        'amount': amount.toStringAsFixed(2),
-        'status': status,
-        'reference': reference,
-      },
-    );
+  /// Confirma el pago de un pedido con el método no-Stripe seleccionado
+  /// (CASH, QR, TRANSFER). El backend descuenta stock y marca la orden
+  /// como CONFIRMED en una sola operación atómica.
+  Future<void> payOrder(int orderId) async {
+    await _dio.post<dynamic>('/sales/orders/$orderId/pay/');
   }
 
   List<Map<String, dynamic>> _toList(dynamic data) {
