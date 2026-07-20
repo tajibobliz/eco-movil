@@ -19,4 +19,5 @@ class AppRoutes {
   static const checkout = '/checkout';
   static const mySupport = '/cliente/soporte';
   static const ticketDetail = '/cliente/soporte/ticket';
+  static const orderTracking = '/cliente/pedido/seguimiento';
 }

@@ -17,6 +17,8 @@ import 'features/delivery/presentation/delivery_status_page.dart';
 import 'features/delivery/presentation/delivery_stores_page.dart';
 import 'features/home/presentation/welcome_page.dart';
 import 'features/orders/presentation/my_orders_page.dart';
+import 'features/orders/presentation/order_tracking_page.dart';
+import 'features/orders/data/order_model.dart';
 import 'features/profile/presentation/customer_profile_page.dart';
 import 'features/support/presentation/mis_tickets_page.dart';
 import 'features/support/presentation/ticket_detalle_page.dart';
@@ -67,6 +69,15 @@ class EcoCustomerApp extends StatelessWidget {
           return MaterialPageRoute<void>(
             builder: (_) => TicketDetallePage(
               ticketId: settings.arguments! as int,
+            ),
+          );
+        }
+
+        if (settings.name == AppRoutes.orderTracking &&
+            settings.arguments is OrderModel) {
+          return MaterialPageRoute<void>(
+            builder: (_) => OrderTrackingPage(
+              order: settings.arguments! as OrderModel,
             ),
           );
         }

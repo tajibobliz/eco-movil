@@ -263,10 +263,16 @@ class _MyOrdersPageState extends State<MyOrdersPage> {
                   itemCount: filtered.length,
                   itemBuilder: (context, index) {
                     final order = filtered[index];
-                    return _OrderCard(
-                      order: order,
-                      cancelling: _cancellingOrderId == order.id,
-                      onCancel: () => _cancelOrder(order),
+                    return GestureDetector(
+                      onTap: () => Navigator.of(context).pushNamed(
+                        AppRoutes.orderTracking,
+                        arguments: order,
+                      ),
+                      child: _OrderCard(
+                        order: order,
+                        cancelling: _cancellingOrderId == order.id,
+                        onCancel: () => _cancelOrder(order),
+                      ),
                     );
                   },
                 ),
